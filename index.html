@@ -16,12 +16,12 @@
             line-height: 50px;
             word-spacing: 20px;
             font-weight: bold;
+            cursor: none;
         }
 
         body {
             margin: 0px;
             padding: 0px;
-            padding-left: 10px
         }
 
         #text {
@@ -29,16 +29,76 @@
             top: 0px;
             left: 20px;
         }
+
+        button {
+            font-family: 'Michroma', sans-serif;
+            background: #000;
+            color: rgb(0, 255, 157);
+            font-size: 25px;
+            font-weight: bold;
+            border: 2px solid rgb(0, 255, 157);
+            padding: 20px;
+            border-radius: 10px;
+            cursor: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: button_anim 1s infinite;
+        }
+
+        @keyframes button_anim {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        button:focus {
+            outline: 0;
+        }
     </style>
 </head>
 
 <body>
 
+    <button onclick='boot()' autofocus>BOOT</button>
     <div id='text'></div>
 
     <script>
 
         // ------------------------------------------------ DISPLAY SYSTEM
+
+        function set_full_screen() {
+            let elem = document.documentElement
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen()
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen()
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen()
+            }
+            document.getElementsByTagName('button')[0].setAttribute('hidden', true)
+        }
+
+        function set_no_full_screen() {
+            let elem = document.documentElement
+            if (elem.exitFullscreen) {
+                elem.exitFullscreen()
+            } else if (elem.webkitExitFullscreen) { /* Safari */
+                elem.webkitExitFullscreen()
+            } else if (elem.msExitFullscreen) { /* IE11 */
+                elem.msExitFullscreen()
+            }
+            document.getElementsByTagName('button')[0].removeAttribute('hidden')
+        }
 
         let drawing_tos = {}
         let disp_time = 40
@@ -110,18 +170,21 @@
         var agent_code = null
 
         async function boot() {
+            set_full_screen()
             // await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\nbooting . . .', 2000)
             // await draw_text('boot sequence complete', 2000)
             // let agent_code = await input('enter agent code')
             // await draw_text('agent ' + agent_code + ' logged in')
+            await draw_text('', 2000)
             await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\n', 3000)
             await draw_text('comming soon . . .', 3000)
             await draw_text('end of transmission.', 5000)
+            set_no_full_screen()
         }
 
         // ------------------------------------------------ MAIN
 
-        boot()
+        // boot()
 
     </script>
 
