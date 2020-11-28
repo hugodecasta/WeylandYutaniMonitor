@@ -313,7 +313,7 @@
             })
         }
         socket.on('disconnect', () => {
-            console.log('error')
+            console.log('error server disconnected')
             error('Weyland yutani server unreachable\nretrying in 5 seconds ...')
             setTimeout(() => location.reload(), 5000)
         })
@@ -487,7 +487,6 @@
                     agent = new_agent
                 },
                 'new_message': async (message_data) => {
-                    console.log('new message')
                     let old_available = screen_available
                     screen_available = true
                     await log(`**mandatory message**\n${message_data.message}`)
@@ -554,20 +553,20 @@
         // ------------------------------- BOOT
         async function load_os_data() {
             let version = await request('version')
-            await log(`**Weyland-Yutani CORP.**\nMonitor OS **v${version}**`, 5000)
+            await log(`**Weyland-Yutani CORP.**\nMonitor OS **v${version}**`, 3000)
         }
 
         async function boot() {
             // --- check mobile device
             if (window.mobileCheck()) {
-                await log('Mobile device detected\nPlease use a proper\n**wide screen machine**', 10000)
+                await log('Mobile device detected\nPlease use a proper\n**wide screen machine**', 50000)
                 await log('end of transmission.', 3000)
                 return
             }
 
             // --- boot system
             await load_os_data()
-            await log('boot sequence complete', 2000)
+            await log('boot sequence complete', 1000)
             // --- launch system
             await system_loop(null, JSON.parse(localStorage.getItem('agent_ids') ?? '{"agent_code":null,"agent_secret":null}'))
         }
