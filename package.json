@@ -26,6 +26,7 @@
   "dependencies": {
     "cryptr": "^6.0.2",
     "express": "^4.17.1",
+    "serve-favicon": "^2.5.0",
     "uuid": "^8.3.1"
   }
 }
