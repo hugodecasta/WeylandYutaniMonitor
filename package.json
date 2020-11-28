@@ -1,6 +1,6 @@
 {
   "name": "weyland-yutani-monitor",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Weyland Yutani Communication System",
   "main": "index.js",
   "scripts": {
@@ -24,9 +24,10 @@
   },
   "homepage": "https://github.com/hugodecasta/WeylandYutaniMonitor#readme",
   "dependencies": {
-    "cryptr": "^6.0.2",
+    "@rlvt/crypt": "^1.0.0",
     "express": "^4.17.1",
     "serve-favicon": "^2.5.0",
+    "socket.io": "^3.0.3",
     "uuid": "^8.3.1"
   }
 }

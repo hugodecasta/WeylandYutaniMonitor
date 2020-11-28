@@ -84,12 +84,17 @@
 
 <body>
 
-    <button onclick='boot()' autofocus>BOOT</button>
+    <button onclick='press_boot()' hidden>BOOT</button>
     <div id='text'></div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
 
+        var DEBUG = false
+
         // ------------------------------------------------ DISPLAY SYSTEM
+
+        // -- PROD : reset full screen
 
         window.mobileCheck = function () {
             let check = false;
@@ -99,32 +104,16 @@
 
         function set_full_screen() {
             document.getElementsByTagName('button')[0].setAttribute('hidden', true)
-            // if (window.mobileCheck) return
-            let elem = document.documentElement
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen()
-            } else if (elem.webkitRequestFullscreen) { /* Safari */
-                elem.webkitRequestFullscreen()
-            } else if (elem.msRequestFullscreen) { /* IE11 */
-                elem.msRequestFullscreen()
-            }
         }
 
         function set_no_full_screen() {
             document.getElementsByTagName('button')[0].removeAttribute('hidden')
             document.getElementsByTagName('button')[0].focus()
-            let elem = document.documentElement
-            if (elem.exitFullscreen) {
-                elem.exitFullscreen()
-            } else if (elem.webkitExitFullscreen) { /* Safari */
-                elem.webkitExitFullscreen()
-            } else if (elem.msExitFullscreen) { /* IE11 */
-                elem.msExitFullscreen()
-            }
         }
 
+        let screen_available = true
         let drawing_tos = {}
-        let disp_time = 40
+        let disp_time = DEBUG ? 0 : 40
         let line_height = window.mobileCheck() ? 15 : 30
 
         function clear_screen() {
@@ -132,9 +121,22 @@
             Object.keys(drawing_tos).forEach(to => clearTimeout(to))
         }
 
+        async function wait_for_screen_availability() {
+            return new Promise(ok => {
+                let int = setInterval(() => {
+                    if (screen_available) {
+                        clearInterval(int)
+                        ok()
+                    }
+                })
+            })
+        }
+
         let pre_load_audio = new Audio('/assets/bip.wav')
-        function draw_text(text, remove_to = null) {
+        async function log(text, remove_to = null) {
+            await wait_for_screen_availability()
             clear_screen()
+            screen_available = false
             let text_lines = text.split('\n').length
             let top = `calc(50% - ${text_lines * line_height}px)`
             document.getElementById('text').style.top = top
@@ -143,10 +145,11 @@
                     set_text(text.slice(0, i + 1))
                     let bip = new Audio('/assets/bip.wav')
                     bip.volume = 0.5
-                    bip.play()
+                    if (!DEBUG) bip.play()
                 }, disp_time * i)
                 drawing_tos[this_to] = true
             }
+            remove_to = DEBUG ? (0) : remove_to
             if (remove_to) {
                 let rto = setTimeout(() => {
                     clear_screen()
@@ -154,32 +157,140 @@
                 drawing_tos[rto] = true
             }
             return new Promise(ok =>
-                setTimeout(() => ok(), text.length * disp_time + (remove_to ?? 0))
+                setTimeout(() => {
+                    Object.keys(drawing_tos).forEach(rto => clearTimeout(rto))
+                    screen_available = true
+                    ok()
+                }, text.length * disp_time + (remove_to ?? 0))
             )
         }
 
-        async function input(text) {
+        async function input(text, secret = false, display_square = true, display_dots = true, display_timeout = null, end_timeout = null) {
             return new Promise(async ok => {
-                text += ' : '
-                await draw_text(text)
+                await log(text)
+                screen_available = false
                 let inp_text = ''
                 let show_square = false
-                let disp_text = () => set_text(text + inp_text + (show_square ? '█' : ''))
+                let disp_to = null
+                let end_to = null
+                let disp_text = () => {
+                    show_square &= display_square
+                    let disp = secret ? Array.from(inp_text).map(c => ' - ').join('') : inp_text
+                    set_text(text + (display_dots ? ' : ' : '') + disp + (show_square ? '█' : ''))
+                }
+                let int = null
+                if (display_square) {
+                    int = setInterval(() => {
+                        show_square = !show_square
+                        disp_text()
+                    }, 500)
+                }
+                disp_text()
+                let reset_tos = () => {
+                    if (display_timeout) {
+                        clearTimeout(disp_to)
+                        disp_to = setTimeout(() => clear_screen(), display_timeout)
+                    }
+                    if (end_timeout) {
+                        clearTimeout(end_to)
+                        end_to = setTimeout(() => {
+                            clearInterval(int)
+                            clearTimeout(disp_to)
+                            clearTimeout(end_to)
+                            document.removeEventListener('keydown', key_handle)
+                            screen_available = true
+                            ok(null)
+                        }, end_timeout)
+                    }
+                }
+                reset_tos()
+                let key_handle = (evt) => {
+                    if (evt.key == 'Enter') {
+                        clearInterval(int)
+                        clearTimeout(disp_to)
+                        clearTimeout(end_to)
+                        document.removeEventListener('keydown', key_handle)
+                        screen_available = true
+                        ok(inp_text)
+                        return
+                    }
+                    else if (evt.key == 'Backspace') {
+                        inp_text = Array.from(inp_text)
+                        inp_text.pop()
+                        inp_text = inp_text.join('')
+                    }
+                    else {
+                        inp_text += evt.key
+                    }
+                    inp_text = inp_text.toUpperCase()
+                    disp_text()
+                    reset_tos()
+                }
+                let evtl = document.addEventListener('keydown', key_handle)
+            })
+        }
+
+        async function free_input(pre_text = '') {
+            await wait_for_screen_availability()
+            return new Promise(async ok => {
+                clear_screen()
+                document.getElementById('text').style.top = '10px'
+                screen_available = false
+                let inp_text = pre_text
+                let show_square = false
+                let disp_text = () => {
+                    set_text(inp_text + (show_square ? '█' : ''))
+                }
                 let int = setInterval(() => {
                     show_square = !show_square
                     disp_text()
                 }, 500)
+                disp_text()
                 let key_handle = (evt) => {
-                    if (evt.key == 'Enter') {
+                    if (evt.key == 'Enter' && evt.ctrlKey) {
                         clearInterval(int)
                         document.removeEventListener('keydown', key_handle)
+                        screen_available = true
                         ok(inp_text)
+                        return
                     }
-                    else inp_text += evt.key
+                    else if (evt.key == 'Enter') {
+                        inp_text += '\n'
+                    }
+                    else if (evt.key == 'Backspace') {
+                        inp_text = Array.from(inp_text)
+                        inp_text.pop()
+                        inp_text = inp_text.join('')
+                    }
+                    else {
+                        inp_text += evt.key
+                    }
+                    inp_text = inp_text.toUpperCase()
                     disp_text()
                 }
                 let evtl = document.addEventListener('keydown', key_handle)
             })
+        }
+
+        async function waiter(text, timeout = null) {
+            await input(text, false, false, false, timeout)
+        }
+
+        async function passive_waiter() {
+            return new Promise(ok => {
+                let key_handle = (evt) => {
+                    if (evt.key == 'Enter') {
+                        document.removeEventListener('keydown', key_handle)
+                        ok()
+                    }
+                }
+                let evtl = document.addEventListener('keydown', key_handle)
+            })
+        }
+
+        async function confirmation(text) {
+            let resp = await input(text + ' (Y/n)')
+            return resp == 'Y' || resp == ''
         }
 
         function set_text(text) {
@@ -189,24 +300,315 @@
             document.getElementById('text').innerHTML = html_text
         }
 
+        // ------------------------------------------------ IO SYSTEM
+
+        var socket = io()
+        async function request(name, data = null, sock = socket) {
+            sock.emit('request', { name, data })
+            return new Promise(ok => {
+                sock.on('request_response', (data) => {
+                    sock.off('request_response')
+                    ok(data)
+                })
+            })
+        }
+        socket.on('disconnect', () => {
+            console.log('error')
+            error('Weyland yutani server unreachable\nretrying in 5 seconds ...')
+            setTimeout(() => location.reload(), 5000)
+        })
+
         // ------------------------------------------------ OS
 
-        var agent_code = null
+        async function api(api, method, headers = {}, body = null) {
+            if (agent_token) headers.authorization = 'WY ' + agent_token
+            let option = { method, headers }
+            if (body) option.body = JSON.stringify(body)
+            return await (await fetch('/api' + api, option)).json()
+        }
+        async function api_get(api_endpoint) {
+            return await api(api_endpoint, 'GET')
+        }
+
+        async function api_post(api, data) {
+            return await api(api_endpoint, 'POST')
+        }
+
+        // ------------------------------- COMMANDS
+
+        async function display_list(name, list) {
+            let text = ['**' + name + '**', ...list.map(elm => ' - ' + elm)]
+            await log(text.join('\n'))
+            await passive_waiter()
+        }
+
+        async function error(message) {
+            screen_available = true
+            await log('**error**\n' + message, 3000)
+        }
+
+        let commands = {
+            'exit': async () => {
+                return false
+            },
+            'help': async () => {
+                clear_screen()
+                await log('**commands**:\n' + Object.keys(commands).map(c => ' - ' + c).join('\n'))
+                await passive_waiter()
+            },
+            'infos': async (agent) => {
+                let forbidden_props = ['last_read', 'agent_secret']
+                await display_list('agent data', Object.keys(agent).map(key => {
+                    let value = agent[key]
+                    if (typeof value != 'object' && !forbidden_props.includes(key))
+                        return key + ' : ' + value
+                    return null
+                }).filter(e => e))
+            },
+            'new sub': async (agent) => {
+                if (!await confirmation('you are about to add a sub agent.\ncontinue ?')) return
+                let all_props = ['first name', 'last name', 'birth date', 'job', 'status']
+                let args = []
+                for (let name of all_props) {
+                    let value = await input('sub agent ' + name)
+                    args.push(value)
+                }
+                if (!await confirmation('create ?')) return
+                let new_sub = await request('register_new_agent', { from_agent: agent, args })
+                if (!new_sub) return error('unable to create new sub agent')
+            },
+            'subs': async (agent) => {
+                await display_list('sub agents', agent.base.subs.length ?
+                    agent.base.subs.map(s => s.agent_code)
+                    :
+                    ['no sub agent display'])
+            },
+            'set': async (agent) => {
+                let from_agent = null
+                if (agent.n1) {
+                    await log('agent update needs n1 access', 3000)
+                    let n1_secret = await input('please enter ' + agent.n1 + ' secret')
+                    from_agent = { agent_code: agent.n1, agent_secret: n1_secret }
+                }
+                let mod_agent = JSON.parse(JSON.stringify(agent))
+                let prop_name = ''
+                while (!(prop_name in mod_agent)) {
+                    prop_name = (await input('property name')).toLowerCase()
+                    if (!(prop_name in mod_agent)) error('wrong property name')
+                }
+                let prop_value = await input('property value (' + mod_agent[prop_name] + ')')
+                mod_agent[prop_name] = prop_value
+                await log('updating ...')
+                let resp = await request('save_agent', { agent: mod_agent, from_agent })
+                if (!resp) return error('error while updating agent')
+                await log('agent updated.', 3000)
+            },
+            'sub info': async (agent) => {
+                if (agent.base.subs.length == 0) return await error('no sub agents.')
+                let sub_agent_code = await input('sub agent code')
+                let sub_agent = agent.base.subs.filter(s => s.agent_code == sub_agent_code)[0]
+                if (!sub_agent) {
+                    await error('sub agent not found.')
+                    return
+                }
+                await log('loading sub agent . . .')
+                sub_agent = await request('load_sub_agent', { agent, sub_agent })
+                await display_list('sub agent data', Object.keys(sub_agent).map(k => k + ' : ' + sub_agent[k]))
+            },
+            'impersonate': async (agent) => {
+                if (agent.base.subs.length == 0) return await error('no sub agents.')
+                let sub_agent_code = await input('sub agent code')
+                let sub_agent = agent.base.subs.filter(s => s.agent_code == sub_agent_code)[0]
+                if (!sub_agent) return error('sub agent not found.')
+                await system_loop(null, sub_agent, false)
+            },
+            'sub conv': async (agent) => {
+                if (agent.base.subs.length == 0) return await error('no sub agents.')
+                let sub_agent_code = await input('sub agent code')
+                let sub_agent = agent.base.subs.filter(s => s.agent_code == sub_agent_code)[0]
+                if (!sub_agent) {
+                    await error('sub agent not found.')
+                    return
+                }
+                let conversation = await request('get_conversation', sub_agent)
+                await log(sub_agent_code + ' conv with ' + conversation.length + ' data')
+                await passive_waiter()
+            },
+            'conv': async (agent) => {
+                let conversation = await request('get_conversation', agent)
+                await log('n1 conv with ' + conversation.length + ' data')
+                await passive_waiter()
+            },
+            'report': async (agent) => {
+                let message = await free_input()
+                let resp = await request('report', { agent, message })
+            },
+            'message': async (agent) => {
+                if (agent.base.subs.length == 0) return await error('no sub agents.')
+                let sub_agent_code = await input('sub agent code')
+                let sub_agent = agent.base.subs.filter(s => s.agent_code == sub_agent_code)[0]
+                if (!sub_agent) {
+                    await error('sub agent not found.')
+                    return
+                }
+                let message = await free_input()
+                let resp = await request('message', { agent, sub_agent, message })
+            },
+            'connect io': async (agent) => {
+                if (agent.base.subs.length == 0) return await error('no sub agents.')
+                let sub_agent_code = await input('sub agent code')
+                let sub_agent = agent.base.subs.filter(s => s.agent_code == sub_agent_code)[0]
+                if (!sub_agent) {
+                    await error('sub agent not found.')
+                    return
+                }
+                let { agent_code, agent_secret } = sub_agent
+                let enc_secret = agent_code + agent_secret
+                let logger = async (report_data) => {
+                    await log(`**report from ${agent_code}**\n${report_data.message}`)
+                }
+                let sub_socket = io()
+                await request('register_io', sub_agent, sub_socket)
+                sub_socket.on('new_report' + enc_secret, logger)
+                clear_screen()
+                await passive_waiter()
+                sub_socket.off('new_report' + enc_secret, logger)
+                sub_socket.close()
+            }
+        }
+
+        // ------------------------------- SYSTEM
+
+        async function system_loop(agent = null, { agent_code, agent_secret }, save_ids = true) {
+
+            // --- IO BOUNDS
+            let inpout = {
+                'save_agent': (new_agent) => {
+                    agent = new_agent
+                },
+                'new_message': async (message_data) => {
+                    console.log('new message')
+                    let old_available = screen_available
+                    screen_available = true
+                    await log(`**mandatory message**\n${message_data.message}`)
+                    screen_available = old_available
+                },
+            }
+
+            function setup_io(register = true) {
+                let enc_secret = agent_code + agent_secret
+                Object.keys(inpout).forEach(name => {
+                    if (register)
+                        socket.on(name + enc_secret, inpout[name])
+                    else
+                        socket.off(name + enc_secret, inpout[name])
+                })
+            }
+
+            // --- MAIN RUNNER
+            let run = true
+            while (run) {
+                // --- agent AUTH
+                while (!agent) {
+                    if (!agent_code || !agent_secret) {
+                        agent_code = await input('agent code')
+                        agent_secret = await input('agent secret', true)
+                    }
+                    await log(`checking agent code . . .`)
+                    agent = await request('load_agent', { agent_code, agent_secret })
+                    if (!agent) {
+                        agent_code = null
+                        agent_secret = null
+                        await error('Wrong agent ids.')
+                        continue
+                    }
+                    let register_io = request('register_io', agent)
+                    setup_io(true)
+                }
+                if (save_ids)
+                    localStorage.setItem('agent_ids', JSON.stringify({ agent_code, agent_secret }))
+                await log('access granted', 2000)
+
+                // --- COMMANDS
+                while (agent && run) {
+                    let answ = null
+                    if (!DEBUG) await waiter('press "enter" for command', 5000)
+                    let ask = (await input(agent.agent_code + ' > ', false, true, false, null, 10000))?.toLowerCase()
+                    if (!ask) continue
+                    if (ask in commands) answ = await commands[ask](agent)
+                    else await error('command not found.')
+                    if (answ === false) run = false
+                }
+
+                // --- EXIT
+                agent_code = null
+                agent_secret = null
+                if (save_ids)
+                    localStorage.setItem('agent_ids', JSON.stringify({ agent_code, agent_secret }))
+            }
+
+            // --- UNBOUND IOs
+            setup_io(false)
+        }
+
+        // ------------------------------- BOOT
+        async function load_os_data() {
+            let version = await request('version')
+            await log(`**Weyland-Yutani CORP.**\nMonitor OS **v${version}**`, 5000)
+        }
 
         async function boot() {
-            set_full_screen()
-            // await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\nbooting . . .', 2000)
-            // await draw_text('boot sequence complete', 2000)
-            // let agent_code = await input('enter agent code')
-            // await draw_text('agent ' + agent_code + ' logged in')
-            await draw_text('', 2000)
-            await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\n', 3000)
-            await draw_text('coming soon . . .', 3000)
-            await draw_text('end of transmission.', 5000)
-            set_no_full_screen()
+            // --- check mobile device
+            if (window.mobileCheck()) {
+                await log('Mobile device detected\nPlease use a proper\n**wide screen machine**', 10000)
+                await log('end of transmission.', 3000)
+                return
+            }
+
+            // --- boot system
+            await load_os_data()
+            await log('boot sequence complete', 2000)
+            // --- launch system
+            await system_loop(null, JSON.parse(localStorage.getItem('agent_ids') ?? '{"agent_code":null,"agent_secret":null}'))
+        }
+
+        // ------------------------------------------------ BOOT LOOP
+
+        var allow_boot = false
+        function press_boot() { allow_boot = true }
+
+        async function boot_button() {
+            if (DEBUG) return true
+            allow_boot = false
+            return new Promise(ok => {
+                let int = setInterval(() => {
+                    if (allow_boot) {
+                        clearInterval(int)
+                        ok()
+                    }
+                })
+            })
+        }
+
+        async function boot_loop() {
+            while (true) {
+                set_no_full_screen()
+                await boot_button()
+                set_full_screen()
+                await boot()
+            }
         }
 
         // ------------------------------------------------ MAIN
+
+        boot_loop()
+
+        // --- old welcome "coming soon" message
+        // await draw_text('', 2000)
+        // await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\n', 3000)
+        // await draw_text('coming soon . . .', 3000)
+        // await draw_text('end of transmission.', 5000)
+        // set_no_full_screen()
 
         // boot()
 
