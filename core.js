@@ -114,7 +114,7 @@ async function save_file(name, secret, data) {
 async function create_agent_object(n1_agent, firstname, lastname, birth, job, status) {
     let code = Math.trunc(Math.random() * 10000)
     let agent_code = (code + '').padStart(5, '0') + '-' + firstname.toUpperCase().charAt(0) + lastname.toUpperCase().charAt(0)
-    let agent_secret = DEBUG ? '00000' : Math.trunc(Math.random() * 100000)
+    let agent_secret = DEBUG ? '00000' : (Math.trunc(Math.random() * 100000) + '')
     let now = Date.now()
     let new_agent = {
         firstname, lastname,
