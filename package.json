@@ -24,6 +24,8 @@
   },
   "homepage": "https://github.com/hugodecasta/WeylandYutaniMonitor#readme",
   "dependencies": {
-    "express": "^4.17.1"
+    "cryptr": "^6.0.2",
+    "express": "^4.17.1",
+    "uuid": "^8.3.1"
   }
 }

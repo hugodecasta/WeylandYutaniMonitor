@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge, chrome=1" />
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap" rel="stylesheet">
+    <title>Weyland-Yutani IO</title>
+    <style>
+        html {
+            font-family: 'Michroma', sans-serif;
+            background: #000;
+            color: rgb(0, 255, 157);
+            font-size: 25px;
+            line-height: 50px;
+            word-spacing: 20px;
+            font-weight: bold;
+        }
+
+        body {
+            margin: 0px;
+            padding: 0px;
+            padding-left: 10px
+        }
+
+        #text {
+            position: absolute;
+            top: 0px;
+            left: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id='text'></div>
+
+    <script>
+
+        // ------------------------------------------------ DISPLAY SYSTEM
+
+        let drawing_tos = {}
+        let disp_time = 40
+        let line_height = 30
+
+        function clear_screen() {
+            set_text('')
+            Object.keys(drawing_tos).forEach(to => clearTimeout(to))
+        }
+
+        function draw_text(text, remove_to = null) {
+            clear_screen()
+            let text_lines = text.split('\n').length
+            let top = `calc(50% - ${text_lines * line_height}px)`
+            document.getElementById('text').style.top = top
+            for (let i = 0; i < text.length; ++i) {
+                let this_to = setTimeout(() => {
+                    set_text(text.slice(0, i + 1))
+                    let bip = new Audio('/assets/bip.wav')
+                    bip.volume = 0.5
+                    bip.play()
+                }, disp_time * i)
+                drawing_tos[this_to] = true
+            }
+            if (remove_to) {
+                let rto = setTimeout(() => {
+                    clear_screen()
+                }, text.length * disp_time + remove_to)
+                drawing_tos[rto] = true
+            }
+            return new Promise(ok =>
+                setTimeout(() => ok(), text.length * disp_time + (remove_to ?? 0))
+            )
+        }
+
+        async function input(text) {
+            return new Promise(async ok => {
+                text += ' : '
+                await draw_text(text)
+                let inp_text = ''
+                let show_square = false
+                let disp_text = () => set_text(text + inp_text + (show_square ? '█' : ''))
+                let int = setInterval(() => {
+                    show_square = !show_square
+                    disp_text()
+                }, 500)
+                let key_handle = (evt) => {
+                    if (evt.key == 'Enter') {
+                        clearInterval(int)
+                        document.removeEventListener('keydown', key_handle)
+                        ok(inp_text)
+                    }
+                    else inp_text += evt.key
+                    disp_text()
+                }
+                let evtl = document.addEventListener('keydown', key_handle)
+            })
+        }
+
+        function set_text(text) {
+            let html_text = text.toUpperCase().replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, (m, g) => `<u>${g}</u>`)
+                .replace(/\*/g, '')
+            document.getElementById('text').innerHTML = html_text
+        }
+
+        // ------------------------------------------------ OS
+
+        var agent_code = null
+
+        async function boot() {
+            // await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\nbooting . . .', 2000)
+            // await draw_text('boot sequence complete', 2000)
+            // let agent_code = await input('enter agent code')
+            // await draw_text('agent ' + agent_code + ' logged in')
+            await draw_text('**Weyland-yutani corp.**\nmonitor OS **v0.1.0**\n', 3000)
+            await draw_text('comming soon . . .', 3000)
+            await draw_text('end of transmission.', 5000)
+        }
+
+        // ------------------------------------------------ MAIN
+
+        boot()
+
+    </script>
+
+</body>
+
+</html>

@@ -2,8 +2,10 @@ const express = require('express')
 const app = express()
 const port = process.env.PORT
 
+app.use('/assets', express.static(`${__dirname}/assets`));
+
 app.get('/', (req, res) => {
-    res.send('<h1>Weyland-Yutani communication system<h1><br><h2>Comming soon !!!<h2>')
+    res.sendFile(`${__dirname}/index.html`)
 })
 
 app.listen(port, () => {
