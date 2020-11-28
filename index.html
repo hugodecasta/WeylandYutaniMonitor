@@ -90,7 +90,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
 
-        var DEBUG = false
+        var DEBUG = true
 
         // ------------------------------------------------ DISPLAY SYSTEM
 
@@ -219,7 +219,7 @@
                         inp_text.pop()
                         inp_text = inp_text.join('')
                     }
-                    else {
+                    else if ((evt.location == 0 || evt.location == 3) && evt.key.length == 1) {
                         inp_text += evt.key
                     }
                     inp_text = inp_text.toUpperCase()
@@ -262,7 +262,7 @@
                         inp_text.pop()
                         inp_text = inp_text.join('')
                     }
-                    else {
+                    else if ((evt.location == 0 || evt.location == 3) && evt.key.length == 1) {
                         inp_text += evt.key
                     }
                     inp_text = inp_text.toUpperCase()
