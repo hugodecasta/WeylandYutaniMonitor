@@ -275,13 +275,15 @@
             })
         }
 
-        async function wait_for_key(info = null, timeout = null) {
+        async function wait_for_key(info = null, timeout = null, specific_key = null) {
             await wait_for_screen_availability()
             if (info) log(info, timeout)
             return new Promise(async ok => {
                 let key_handle = (evt) => {
-                    free_screen()
-                    document.removeEventListener('keydown', key_handle)
+                    if (!specific_key || evt.key == specific_key) {
+                        free_screen()
+                        document.removeEventListener('keydown', key_handle)
+                    }
                     ok(evt.key)
                 }
                 let evtl = document.addEventListener('keydown', key_handle)
@@ -304,10 +306,11 @@
 
         var socket = io()
         async function request(name, data = null, sock = socket) {
-            sock.emit('request', { name, data })
+            let response_code = Math.trunc(Math.random() * 100000)
+            sock.emit('request', { name, data, response_code })
             return new Promise(ok => {
-                sock.on('request_response', (data) => {
-                    sock.off('request_response')
+                sock.on('request_response_' + response_code, (data) => {
+                    sock.off('request_response_' + response_code)
                     if (data && typeof data == 'object' && 'error' in data) {
                         error(data.error)
                         data = null
@@ -348,6 +351,21 @@
             socket.off(beam_secret)
             if (verbose) await log('beam disconnected', 3000)
             return beam_secret
+        }
+
+        function get_last_time_check() {
+            return parseInt(localStorage.getItem('last_time_check') ?? '0')
+        }
+
+        async function get_new_messages(beams) {
+            let last_time_check = get_last_time_check()
+            let all_beam_data = await Promise.all(Object.keys(beams).map(async beam_name => {
+                let { beam_code } = beams[beam_name]
+                let beam_file = await request('load_beam_file', { beam_name, beam_code })
+                let new_messages = beam_file.filter(message_data => message_data.date > last_time_check)
+                return { beam_name, new_messages }
+            }))
+            return all_beam_data
         }
 
         // ------------------------------- COMMANDS
@@ -451,23 +469,15 @@
                         await log('no beam connected')
                         return
                     }
-                    let last_time_check = parseInt(localStorage.getItem('last_time_check') ?? '0')
+                    let last_time_check = get_last_time_check()
                     await log('loading beams data . . .')
-                    let all_beam_data = []
-                    for (let beam_name in beams) {
-                        let { beam_code } = beams[beam_name]
-                        let beam_file = await request('load_beam_file', { beam_name, beam_code, TO_OVERRIDE_DIV: beams_len })
-                        let new_messages = beam_file.filter(message_data => message_data.date > last_time_check)
-                        all_beam_data.push({ beam_name, new_messages })
-                    }
+                    let all_beam_data = await get_new_messages(beams)
                     for (let { beam_name, new_messages } of all_beam_data) {
                         let key = await wait_for_key(`**${beam_name}** - **${new_messages.length}** messages\n"Enter" to read / any key to skip`)
                         if (key == 'Enter') {
                             for (let message_data of new_messages) {
                                 last_time_check = message_data.date
-                                message_data.message += '\n\nany key to continue'
                                 await display_message(beam_name, message_data)
-                                await wait_for_key()
                             }
                         }
                     }
@@ -488,7 +498,7 @@
         }
 
         async function display_message(beam_name, { personal_id, message }) {
-            await log(`**message from ${personal_id} on ${beam_name}**\n${message}`)
+            await wait_for_key(`**message from ${personal_id} on ${beam_name}**\n${message}\n\npress q to quit\nEnter to reply`, null, 'q')
         }
 
         async function error(message) {
@@ -557,14 +567,19 @@
                 await Promise.all(Object.values(beams).map(async ({ beam_name, beam_code }) => {
                     await connect_beam(beam_name, beam_code, personal_id, false)
                 }))
-                await log('beams reconnected', 3000)
+                await log('beams reconnected')
+                let new_messages_data = await get_new_messages(beams)
+                console.log(new_messages_data)
+                if (new_messages_data.some(nmd => nmd.new_messages.length > 0)) {
+                    await commands.check_messages.action(beams, personal_id)
+                }
             }
 
             // --- MAIN RUNNER
             while (true) {
                 clear_screen()
                 while (Object.keys(beams).length == 0) {
-                    await commands.register_beam.action(beams)
+                    await commands.register_beam.action(beams, personal_id)
                 }
                 save_ids()
                 let key = await wait_for_key('type "h" for help', 2000)
@@ -583,7 +598,7 @@
             if (Object.keys(beams).length > 0) {
                 await log('disconnecting beams . . .')
                 await Promise.all(Object.values(beams).map(async ({ beam_name, beam_code }) => {
-                    await connect_beam(beam_name, beam_code, personal_id, false)
+                    await disconnect_beam(beam_name, beam_code, false)
                 }))
             }
             beams = {}

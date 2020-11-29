@@ -36,13 +36,13 @@ function init_io(io_engine) {
         socket.on('disconnect', () => {
             all_sockets.splice(all_sockets.indexOf(socket), 1)
         })
-        socket.on('request', async ({ name, data }) => {
+        socket.on('request', async ({ name, data, response_code }) => {
             if (name in requests) {
                 const response_to_here = (data && ('TO_OVERRIDE_DIV' in data)) ? response_to / data.TO_OVERRIDE_DIV : response_to
-                setTimeout(async () => socket.emit('request_response', await requests[name](data, socket)), DEBUG ? 0 : response_to_here)
+                setTimeout(async () => socket.emit('request_response_' + response_code, await requests[name](data, socket)), DEBUG ? 0 : response_to_here)
             }
             else {
-                socket.emit('request_response', { error: 'request does not exist' })
+                socket.emit('request_response_' + response_code, { error: 'request does not exist' })
             }
         })
     })
