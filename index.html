@@ -357,15 +357,33 @@
             return parseInt(localStorage.getItem('last_time_check') ?? '0')
         }
 
-        async function get_new_messages(beams) {
-            let last_time_check = get_last_time_check()
-            let all_beam_data = await Promise.all(Object.keys(beams).map(async beam_name => {
-                let { beam_code } = beams[beam_name]
-                let beam_file = await request('load_beam_file', { beam_name, beam_code })
-                let new_messages = beam_file.filter(message_data => message_data.date > last_time_check)
+        async function get_beam_file(beam_name, beam_code) {
+            return await request('load_beam_file', { beam_name, beam_code })
+        }
+
+        async function get_beam_new_messages(beam_name, beam_code, last_time_check) {
+            let beam_file = await get_beam_file(beam_name, beam_code)
+            let new_messages = beam_file.filter(message_data => message_data.date > last_time_check)
+            return new_messages
+        }
+
+        async function get_all_beams_new_messages(beams, last_time_check) {
+            return await Promise.all(Object.keys(beams).map(async beam_name => {
+                let beam_code = beams[beam_name]
+                let new_messages = await get_beam_new_messages(beam_name, beam_code, last_time_check)
                 return { beam_name, new_messages }
             }))
-            return all_beam_data
+        }
+
+        async function read_beam_messages(last_time_check, beam_name, new_messages) {
+            let key = await wait_for_key(`**${beam_name}** - **${new_messages.length}** messages\n"Enter" to read / any key to skip`)
+            if (key == 'Enter') {
+                for (let message_data of new_messages) {
+                    last_time_check = message_data.date
+                    await display_message(beam_name, message_data)
+                }
+            }
+            return last_time_check
         }
 
         // ------------------------------- COMMANDS
@@ -447,7 +465,7 @@
                 }
             },
             'send_message': {
-                description: 'send message through beam',
+                description: 'send message trough a beam',
                 action: async (beams, personal_id) => {
                     let beam_name = await input_beam_name(beams)
                     if (!beam_name) return
@@ -461,30 +479,35 @@
                     await log('message sent', 3000)
                 }
             },
-            'check_messages': {
-                description: 'check all un-read messages',
+            'check_beam_messages': {
+                description: 'check one beam messages',
+                action: async (beams) => {
+                    let beam_name = await input_beam_name(beams)
+                    if (!beam_name) return
+                    let last_time_check = get_last_time_check()
+                    let { beam_code } = beams[beam_name]
+                    await log('loading beam data . . .')
+                    let beam_messages = await get_beam_new_messages(beam_name, beam_code, last_time_check)
+                    await read_beam_messages(last_time_check, beam_name, beam_messages)
+                    update_read_time(last_time_check)
+                    await log('end of messages.', 3000)
+                }
+            },
+            'check_all_beam_messages': {
+                description: 'check un-read messages from all beams',
                 action: async (beams) => {
                     let beams_len = Object.keys(beams).length
-                    if (beams_len == 0) {
-                        await log('no beam connected')
-                        return
-                    }
+                    if (beams_len == 0) return await log('no beam connected')
                     let last_time_check = get_last_time_check()
-                    await log('loading beams data . . .')
-                    let all_beam_data = await get_new_messages(beams)
+                    await log('loading all beams data . . .')
+                    let all_beam_data = await get_all_beams_new_messages(beams, last_time_check)
                     for (let { beam_name, new_messages } of all_beam_data) {
-                        let key = await wait_for_key(`**${beam_name}** - **${new_messages.length}** messages\n"Enter" to read / any key to skip`)
-                        if (key == 'Enter') {
-                            for (let message_data of new_messages) {
-                                last_time_check = message_data.date
-                                await display_message(beam_name, message_data)
-                            }
-                        }
+                        await read_beam_messages(last_time_check, beam_name, new_messages)
                     }
                     update_read_time(last_time_check)
                     await log('end of messages.', 3000)
                 }
-            }
+            },
         }
 
         async function wait(text) {
@@ -518,7 +541,7 @@
                     await display_list('key commands', Object.keys(key_map).map(key => {
                         let command_name = key_map[key]
                         if (command_name in commands) {
-                            return `${key} : "${command_name.replace('_', ' ')}" - ${commands[command_name].description}`
+                            return `${key} : "${command_name.replace('/\_/g', ' ')}" - ${commands[command_name].description}`
                         } else {
                             return `${key} : call help`
                         }
@@ -527,7 +550,8 @@
                 'Escape': 'exit',
                 'b': 'register_beam',
                 'd': 'disconnect_beam',
-                'c': 'check_messages',
+                'c': 'check_beam_messages',
+                'v': 'check_all_beam_messages',
                 'f': 'beam_file',
                 'Shift': 'display_beams',
                 'Enter': 'send_message',
@@ -568,7 +592,7 @@
                     await connect_beam(beam_name, beam_code, personal_id, false)
                 }))
                 await log('beams reconnected')
-                let new_messages_data = await get_new_messages(beams)
+                let new_messages_data = await get_all_beams_new_messages(beams, get_last_time_check())
                 console.log(new_messages_data)
                 if (new_messages_data.some(nmd => nmd.new_messages.length > 0)) {
                     await commands.check_messages.action(beams, personal_id)

@@ -5,22 +5,23 @@ Weyland-Yutani IO communication system
 
 The WY Monitor OS allows multiple distant entities (HQ, colonial bases, planetary detention complex, etc.) to communicate using Secured Communication Beams.
 
-Any entity can connect to any known beam using a beam name and beam code. Once connected, the entity can recieve and send direct messages trough the beam using its personal id.\
-All messages are stored in a secure database accessible via the beam name and code (Old and unread messages can be accessed).
+Any entity can connect to any known beam using a `beam name` and `beam code`.\
+Once connected, the entity can recieve and send direct messages trough the beam using its `personal id`.\
+All messages are stored in a secure database accessible via the `beam name` and `code` (Old and unread messages can be accessed).
 
 The WY Monitor OS requires at least one beam to be connected.
 
 Make sure to keep you beam access codes in case of a beam disconnection.
 
 ## Usage
- - Open the monitor system
- - Press "Enter" to boot Monitor OS
- - When asked enter your `personal id`
- - At first boot, the OS asks for a beam connection
-   - Enter the `beam name` and `beam code` when required
- - Once connected you can recieve and send messages trough the beam
- - press "b" to connect other beams
- - press "d" to disconnect from beams
- - press "h" for help
+- H : CALL HELP
+- ESCAPE : "EXIT" - DISCONNECT FROM ALL BEAMS
+- B : "REGISTER_BEAM" - REGISTER NEW BEAM
+- D : "DISCONNECT_BEAM" - DISCONNECT BEAM
+- C : "CHECK_BEAM_MESSAGES" - CHECK ONE BEAM MESSAGES
+- V : "CHECK_ALL_BEAM_MESSAGES" - CHECK UN-READ MESSAGES FROM ALL BEAMS
+- F : "BEAM_FILE" - LOAD BEAM FILE DATA
+- SHIFT : "DISPLAY_BEAMS" - DISPLAY REGISTERED BEAMS
+- ENTER : "SEND_MESSAGE" - SEND MESSAGE TROUGH A BEAM
  
 (Input commands can be canceled using `CTRL`+ `c`)
