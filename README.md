@@ -27,5 +27,5 @@ Make sure to keep you beam access codes in case of a beam disconnection.
 (Input commands can be canceled using `CTRL`+ `c`)
 
 ## Inspiration
- * [FIORINA PRISON CLOSING REPORT](https://youtu.be/CrHSw3Fx8H4?t=633)
+ * [FIORINA PRISON CLOSING REPORT](https://youtu.be/CrHSw3Fx8H4?t=63)
  * [SUPT.ANDREWS MS51021](https://youtu.be/bQtqq5dNCiE?t=163)
