@@ -19,8 +19,9 @@ let requests = {
     'beam_secret': async ({ beam_name, beam_code }) => beam_secret(beam_name, beam_code),
     'load_beam_file': async ({ beam_name, beam_code }) => await load_beam_file(beam_name, beam_secret(beam_name, beam_code)),
     'send_message': async ({ beam_name, beam_code, personal_id, message }) => {
-        await send_to_beam(beam_name, beam_code, personal_id, message)
-        return await save_message(beam_name, beam_code, personal_id, message)
+        let message_data = await save_message(beam_name, beam_code, personal_id, message)
+        await send_to_beam(beam_name, beam_code, personal_id, message, message_data.date)
+        return message_data
     }
 }
 
@@ -49,9 +50,9 @@ function init_io(io_engine) {
 
 // ------------------ SEND TO
 
-function send_to_beam(beam_name, beam_code, personal_id, message) {
+function send_to_beam(beam_name, beam_code, personal_id, message, date = Date.now()) {
     let secret = beam_secret(beam_name, beam_code)
-    all_sockets.forEach(socket => socket.emit(secret, { date: Date.now(), personal_id, message }))
+    all_sockets.forEach(socket => socket.emit(secret, { date, personal_id, message }))
 }
 
 // ---------------------------------------------------------- BASE METHODS
@@ -90,7 +91,8 @@ async function save_message(beam_name, beam_code, personal_id, message) {
     let beam_file = await load_beam_file(beam_name, secret)
     let message_data = { date: Date.now(), personal_id, message }
     beam_file.push(message_data)
-    return await save_file(beam_name, secret, beam_file)
+    await save_file(beam_name, secret, beam_file)
+    return message_data
 }
 
 

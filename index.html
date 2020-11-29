@@ -324,6 +324,10 @@
 
         // ------------------------------------------------ OS
 
+        function update_read_time(date) {
+            localStorage.setItem('last_time_check', date)
+        }
+
         // ------------------------------- BEAMS
 
         async function connect_beam(beam_name, beam_code, my_personal_id, verbose = true) {
@@ -331,7 +335,7 @@
             let beam_secret = await request('beam_secret', { beam_name, beam_code })
             socket.on(beam_secret, async ({ personal_id, message, date }) => {
                 if (personal_id == my_personal_id) return
-                localStorage.setItem('last_time_check', date)
+                update_read_time(date)
                 await display_message(beam_name, { personal_id, message })
             })
             if (verbose) await log('beam connected', 3000)
@@ -430,11 +434,12 @@
                     let beam_name = await input_beam_name(beams)
                     if (!beam_name) return
                     let { beam_code } = beams[beam_name]
-                    await log('hit **ctrl + enter** to send message', 5000)
+                    await wait_for_key('write the message\nthen hit **ctrl + enter** to send')
                     let message = await free_input()
                     if (!message) return log('message canceled', 3000)
                     await log('sending message . . .')
-                    await request('send_message', { beam_name, beam_code, personal_id, message })
+                    let { date } = await request('send_message', { beam_name, beam_code, personal_id, message })
+                    update_read_time(date)
                     await log('message sent', 3000)
                 }
             },
@@ -446,7 +451,7 @@
                         await log('no beam connected')
                         return
                     }
-                    let last_time_check = parseInt(localStorage.getItem('last_time_check')) ?? 0
+                    let last_time_check = parseInt(localStorage.getItem('last_time_check') ?? '0')
                     await log('loading beams data . . .')
                     let all_beam_data = []
                     for (let beam_name in beams) {
@@ -466,8 +471,8 @@
                             }
                         }
                     }
+                    update_read_time(last_time_check)
                     await log('end of messages.', 3000)
-                    localStorage.setItem('last_time_check', last_time_check)
                 }
             }
         }
