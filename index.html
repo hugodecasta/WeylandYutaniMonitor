@@ -39,46 +39,10 @@
             height: 100%;
         }
 
-        #text,
-        .text {
+        #text {
             position: absolute;
             top: 0px;
             left: 20px;
-        }
-
-        #writing_diamond {
-            pointer-events: none;
-            font-size: 25px;
-            top: 0px;
-            width: 100px;
-            font-weight: lighter;
-            background: #000;
-            position: absolute;
-            transition: left 0.05s linear;
-            opacity: 0.7;
-            animation: diamond_blink 1s infinite steps(2, jump-none);
-            display: none;
-        }
-
-        #writing_diamond div {
-            position: absolute;
-        }
-
-        #writing_diamond .top {
-            transform: rotate(90deg);
-            left: -0.6px;
-            top: 3.4px;
-            letter-spacing: 2.5px;
-        }
-
-        @keyframes diamond_blink {
-            0% {
-                opacity: 0.7;
-            }
-
-            100% {
-                opacity: 0.4;
-            }
         }
 
         button {
@@ -122,13 +86,6 @@
 
     <button hidden>BOOT</button>
     <div id='text'></div>
-    <div id='writing_diamond'>
-        <div class='top'>🠸🠺</div>
-        <div class='left'>
-            <span class='a'>🠺</span><span class='b'>🠸</span>
-        </div>
-
-    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -177,20 +134,7 @@
             })
         }
 
-        function get_text_width(text_lines) {
-            let text = text_lines.slice().pop()
-            let test_element = document.createElement('div')
-            test_element.setAttribute('class', 'text')
-            test_element.style.opacity = 0
-            test_element.style.pointerEvents = 'none'
-            test_element.innerHTML = text.toUpperCase()
-                .replace(/\*/g, '')
-                .replace(/\s(?![^ ])/g, '&nbsp;')
-            document.body.appendChild(test_element)
-            let width = test_element.offsetWidth
-            test_element.remove()
-            return width + 20
-        }
+
 
         function get_line_height() {
             let font_size = 25
@@ -205,40 +149,6 @@
             let one_line_height = get_line_height()
             let text_height = text_lines_length * one_line_height
             return text_height
-        }
-
-        let last_diamond_top = null
-        let last_diamond_left = null
-        function display_diamond(display = true, lines = [], start_top = null) {
-            let diamond_html = document.getElementById('writing_diamond')
-            diamond_html.style.display = display ? 'block' : 'none'
-            if (display) {
-                let one_line_height = get_line_height()
-                let text_width = get_text_width(lines) + 2
-                let text_height = get_text_height(lines)
-
-                let line_top = text_height - one_line_height - 1
-
-                let diamond_top = `calc(50% - ${text_height / 2}px + ${line_top}px)`
-                if (start_top) {
-                    diamond_top = start_top + line_top + 'px'
-                }
-
-                if (last_diamond_top != diamond_top) display_diamond_jump()
-                last_diamond_top = diamond_top
-                last_diamond_left = text_width
-
-                diamond_html.style.left = text_width + 'px'
-                diamond_html.style.top = diamond_top
-            }
-        }
-
-        function display_diamond_jump() {
-            let diamond_html = document.getElementById('writing_diamond')
-            diamond_html.style.transition = 'none'
-            let to = setTimeout(() => {
-                diamond_html.style.transition = 'left 0.05s'
-            }, 7)
         }
 
         let pre_load_audio = new Audio('/assets/bip.wav')
@@ -273,28 +183,35 @@
             })
         }
 
-        async function input(text, secret = false, display_square = true, display_dots = true, display_timeout = null, end_timeout = null) {
+        async function input(pre_text, secret = false, display_square = true,
+            display_dots = true, display_timeout = null, end_timeout = null,
+            validation_check = (evt) => evt.key == 'Enter'
+        ) {
             return new Promise(async ok => {
-                await log(text)
+                if (pre_text) await log(pre_text)
+                pre_text = pre_text ? pre_text : ''
                 screen_available = false
                 let inp_text = ''
                 let disp_to = null
                 let end_to = null
+                let sq_on = true
                 let disp_text = () => {
                     let disp = secret ? Array.from(inp_text).map(c => ' - ').join('') : inp_text
-                    let full_disp = text + (display_dots ? ' : ' : '') + disp
+                    let full_disp = pre_text + (display_dots ? ' : ' : '') + disp
+                    if (display_square && sq_on) full_disp += '█'
                     set_text(full_disp)
-                    if (display_square) {
-                        display_diamond(true, [full_disp])
-                    }
+                }
+                let int = null
+                if (display_square) {
+                    int = setInterval(() => { sq_on = !sq_on; disp_text() }, 500)
                 }
                 disp_text()
                 let end_of_input = (text) => {
                     clearTimeout(disp_to)
                     clearTimeout(end_to)
+                    clearTimeout(int)
                     document.removeEventListener('keydown', key_handle)
                     free_screen()
-                    display_diamond(false)
                     ok(text)
                 }
                 let reset_tos = () => {
@@ -311,11 +228,14 @@
                 }
                 reset_tos()
                 let key_handle = (evt) => {
-                    if (evt.key == 'Enter') {
+                    if (validation_check(evt)) {
                         return end_of_input(inp_text)
                     }
                     else if (evt.key == 'c' && evt.ctrlKey) {
                         return end_of_input(null)
+                    }
+                    else if (evt.key == 'Enter') {
+                        inp_text += '\n'
                     }
                     else if (evt.key == 'Backspace') {
                         inp_text = Array.from(inp_text)
@@ -335,46 +255,46 @@
 
         async function free_input(pre_text = '') {
             await wait_for_screen_availability()
-            return new Promise(async ok => {
-                clear_screen()
-                document.getElementById('text').style.top = '10px'
-                screen_available = false
-                let inp_text = pre_text
-                let disp_text = () => {
-                    set_text(inp_text)
-                    display_diamond(true, inp_text.split('\n'), 10)
-                }
-                disp_text()
-                let end_of_input = (text) => {
-                    document.removeEventListener('keydown', key_handle)
-                    free_screen()
-                    display_diamond(false)
-                    ok(inp_text)
-                }
-                let key_handle = (evt) => {
-                    if (evt.key == 'Enter' && evt.ctrlKey) {
-                        end_of_input(inp_text)
-                        return
-                    }
-                    else if (evt.key == 'c' && evt.ctrlKey) {
-                        return end_of_input(null)
-                    }
-                    else if (evt.key == 'Enter') {
-                        inp_text += '\n'
-                    }
-                    else if (evt.key == 'Backspace') {
-                        inp_text = Array.from(inp_text)
-                        inp_text.pop()
-                        inp_text = inp_text.join('')
-                    }
-                    else if ((evt.location == 0 || evt.location == 3) && evt.key.length == 1) {
-                        inp_text += evt.key
-                    }
-                    inp_text = inp_text.toUpperCase()
-                    disp_text()
-                }
-                let evtl = document.addEventListener('keydown', key_handle)
-            })
+            document.getElementById('text').style.top = '10px'
+            return await input(null, false, true, false, null, null, (evt) => evt.key == 'Enter' && evt.ctrlKey)
+            // return new Promise(async ok => {
+            //     clear_screen()
+            //     document.getElementById('text').style.top = '10px'
+            //     screen_available = false
+            //     let inp_text = pre_text
+            //     let disp_text = () => {
+            //         set_text(inp_text)
+            //     }
+            //     disp_text()
+            //     let end_of_input = (text) => {
+            //         document.removeEventListener('keydown', key_handle)
+            //         free_screen()
+            //         ok(inp_text)
+            //     }
+            //     let key_handle = (evt) => {
+            //         if (evt.key == 'Enter' && evt.ctrlKey) {
+            //             end_of_input(inp_text)
+            //             return
+            //         }
+            //         else if (evt.key == 'c' && evt.ctrlKey) {
+            //             return end_of_input(null)
+            //         }
+            //         else if (evt.key == 'Enter') {
+            //             inp_text += '\n'
+            //         }
+            //         else if (evt.key == 'Backspace') {
+            //             inp_text = Array.from(inp_text)
+            //             inp_text.pop()
+            //             inp_text = inp_text.join('')
+            //         }
+            //         else if ((evt.location == 0 || evt.location == 3) && evt.key.length == 1) {
+            //             inp_text += evt.key
+            //         }
+            //         inp_text = inp_text.toUpperCase()
+            //         disp_text()
+            //     }
+            //     let evtl = document.addEventListener('keydown', key_handle)
+            // })
         }
 
         async function wait_for_key(info = null, timeout = null, specific_key = null) {
