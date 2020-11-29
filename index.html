@@ -17,7 +17,7 @@
             line-height: 50px;
             word-spacing: 20px;
             font-weight: bold;
-            cursor: none;
+            /* cursor: none; */
         }
 
         @media only screen and (max-width: 600px) {
@@ -39,10 +39,39 @@
             height: 100%;
         }
 
-        #text {
+        #text,
+        .text {
             position: absolute;
             top: 0px;
             left: 20px;
+        }
+
+        #writing_diamond {
+            pointer-events: none;
+            font-size: 40px;
+            top: 0px;
+            width: 100px;
+            font-weight: lighter;
+            background: #000;
+            position: absolute;
+            transition: left 0.05s linear;
+            animation: diamond_blink 1.3s infinite steps(2, jump-none);
+            display: none;
+        }
+
+        #writing_diamond div {
+            position: absolute;
+            left: -6px;
+        }
+
+        @keyframes diamond_blink {
+            0% {
+                opacity: 0.7;
+            }
+
+            100% {
+                opacity: 0.3;
+            }
         }
 
         button {
@@ -86,6 +115,9 @@
 
     <button hidden>BOOT</button>
     <div id='text'></div>
+    <div id='writing_diamond'>
+        <div>❖</div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -116,6 +148,13 @@
             set_text('')
         }
 
+        function set_text(text) {
+            let html_text = text.toUpperCase().replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, (m, g) => `<u>${g}</u>`)
+                .replace(/\*/g, '')
+            document.getElementById('text').innerHTML = html_text
+        }
+
         async function wait_for_screen_availability() {
             return new Promise(ok => {
                 let int = setInterval(() => {
@@ -127,14 +166,78 @@
             })
         }
 
+        function get_text_width(text_lines) {
+            let text = text_lines.slice().pop()
+            let test_element = document.createElement('div')
+            test_element.setAttribute('class', 'text')
+            test_element.style.opacity = 0
+            test_element.style.pointerEvents = 'none'
+            test_element.innerHTML = text.toUpperCase()
+                .replace(/\*/g, '')
+                .replace(/\s(?![^ ])/g, '&nbsp;')
+            document.body.appendChild(test_element)
+            let width = test_element.offsetWidth
+            test_element.remove()
+            return width + 20
+        }
+
+        function get_line_height() {
+            let font_size = 25
+            let line_height = 50
+            let word_spacing = 20
+            let one_line_height = font_size + line_height / 2
+            return one_line_height
+        }
+
+        function get_text_height(text_lines) {
+            let text_lines_length = text_lines.length
+            let one_line_height = get_line_height()
+            let text_height = text_lines_length * one_line_height
+            return text_height
+        }
+
+        let last_diamond_top = null
+        let last_diamond_left = null
+        function display_diamond(display = true, lines = [], start_top = null) {
+            let diamond_html = document.getElementById('writing_diamond')
+            diamond_html.style.display = display ? 'block' : 'none'
+            if (display) {
+                let one_line_height = get_line_height()
+                let text_width = get_text_width(lines)
+                let text_height = get_text_height(lines)
+
+                let diamond_top = `calc(50% - ${text_height / 2}px + ${text_height - one_line_height - 2}px)`
+                if (start_top) {
+                    diamond_top = start_top + (text_height - one_line_height - 2) + 'px'
+                }
+
+                if (last_diamond_top != diamond_top) display_diamond_jump()
+                last_diamond_top = diamond_top
+                last_diamond_left = text_width
+
+                diamond_html.style.left = text_width + 'px'
+                diamond_html.style.top = diamond_top
+            }
+        }
+
+        function display_diamond_jump() {
+            let diamond_html = document.getElementById('writing_diamond')
+            diamond_html.style.transition = 'none'
+            let to = setTimeout(() => {
+                diamond_html.style.transition = 'left 0.05s'
+            }, 7)
+        }
+
         let pre_load_audio = new Audio('/assets/bip.wav')
         async function log(text, remove_to = null) {
             await wait_for_screen_availability()
             clear_screen()
             screen_available = false
-            let text_lines = text.split('\n').length
-            let top = `calc(50% - ${text_lines * line_height}px)`
-            document.getElementById('text').style.top = top
+
+            let text_lines = text.split('\n')
+            let text_height = get_text_height(text_lines)
+            document.getElementById('text').style.top = `calc(50% - ${text_height / 2}px)`
+
             for (let i = 0; i < text.length; ++i) {
                 let this_to = setTimeout(() => {
                     set_text(text.slice(0, i + 1))
@@ -162,22 +265,25 @@
                 await log(text)
                 screen_available = false
                 let inp_text = ''
-                let show_square = false
                 let disp_to = null
                 let end_to = null
                 let disp_text = () => {
-                    show_square &= display_square
                     let disp = secret ? Array.from(inp_text).map(c => ' - ').join('') : inp_text
-                    set_text(text + (display_dots ? ' : ' : '') + disp + (show_square ? '█' : ''))
-                }
-                let int = null
-                if (display_square) {
-                    int = setInterval(() => {
-                        show_square = !show_square
-                        disp_text()
-                    }, 500)
+                    let full_disp = text + (display_dots ? ' : ' : '') + disp
+                    set_text(full_disp)
+                    if (display_square) {
+                        display_diamond(true, [full_disp])
+                    }
                 }
                 disp_text()
+                let end_of_input = (text) => {
+                    clearTimeout(disp_to)
+                    clearTimeout(end_to)
+                    document.removeEventListener('keydown', key_handle)
+                    free_screen()
+                    display_diamond(false)
+                    ok(text)
+                }
                 let reset_tos = () => {
                     if (display_timeout) {
                         clearTimeout(disp_to)
@@ -186,24 +292,11 @@
                     if (end_timeout) {
                         clearTimeout(end_to)
                         end_to = setTimeout(() => {
-                            clearInterval(int)
-                            clearTimeout(disp_to)
-                            clearTimeout(end_to)
-                            document.removeEventListener('keydown', key_handle)
-                            screen_available = true
-                            ok(null)
+                            end_of_input(null)
                         }, end_timeout)
                     }
                 }
                 reset_tos()
-                let end_of_input = (text) => {
-                    clearInterval(int)
-                    clearTimeout(disp_to)
-                    clearTimeout(end_to)
-                    document.removeEventListener('keydown', key_handle)
-                    free_screen()
-                    ok(text)
-                }
                 let key_handle = (evt) => {
                     if (evt.key == 'Enter') {
                         return end_of_input(inp_text)
@@ -234,19 +327,15 @@
                 document.getElementById('text').style.top = '10px'
                 screen_available = false
                 let inp_text = pre_text
-                let show_square = false
                 let disp_text = () => {
-                    set_text(inp_text + (show_square ? '█' : ''))
+                    set_text(inp_text)
+                    display_diamond(true, inp_text.split('\n'), 10)
                 }
-                let int = setInterval(() => {
-                    show_square = !show_square
-                    disp_text()
-                }, 500)
                 disp_text()
                 let end_of_input = (text) => {
-                    clearInterval(int)
                     document.removeEventListener('keydown', key_handle)
                     free_screen()
+                    display_diamond(false)
                     ok(inp_text)
                 }
                 let key_handle = (evt) => {
@@ -293,13 +382,6 @@
         async function confirmation(text) {
             let resp = (await input(text + ' (Y/n)')).toLowerCase()
             return (resp == 'y' || resp == '')
-        }
-
-        function set_text(text) {
-            let html_text = text.toUpperCase().replace(/\n/g, '<br>')
-                .replace(/\*\*(.*?)\*\*/g, (m, g) => `<u>${g}</u>`)
-                .replace(/\*/g, '')
-            document.getElementById('text').innerHTML = html_text
         }
 
         // ------------------------------------------------ IO SYSTEM
@@ -557,30 +639,6 @@
                 'Enter': 'send_message',
             }
 
-            // --- IO BOUNDS
-            // let connected_beams = []
-            // async function setup_io(beam_name, beam_code, register = true) {
-            //     if (!register) {
-            //         connected_beams.forEach(beam_secret => socket.off(beam_secret))
-            //         connected_beams = []
-            //         return
-            //     }
-            //     let beam_secret = await request('beam_secret', { beam_name, beam_code })
-            //     connected_beams.push(beam_secret)
-            //     socket.on(beam_secret, async (beam_data) => {
-            //         let { from_id, message } = beam_data
-            //         if (from_id == personal_id) return
-            //         if (message.includes('order::')) {
-            //             //order::some_id::command::args
-            //             let [order, whome, command, args] = message.split('::')
-            //             args = args.split(',')
-            //             if (command in order_commands) await order_commands[command](args)
-            //         } else {
-            //             await log('**message from ' + from_id + ' on ' + beam_name + '**\n' + message)
-            //         }
-            //     })
-            // }
-
             if (!personal_id) {
                 personal_id = await input('personal id')
                 save_ids()
@@ -593,7 +651,6 @@
                 }))
                 await log('beams reconnected')
                 let new_messages_data = await get_all_beams_new_messages(beams, get_last_time_check())
-                console.log(new_messages_data)
                 if (new_messages_data.some(nmd => nmd.new_messages.length > 0)) {
                     await commands.check_messages.action(beams, personal_id)
                 }
@@ -652,6 +709,7 @@
         // ------------------------------------------------ BOOT LOOP
 
         function boot_button() {
+            if (DEBUG) return
             return new Promise(ok => {
                 document.getElementsByTagName('button')[0].removeAttribute('hidden')
                 document.getElementsByTagName('button')[0].focus()
