@@ -48,29 +48,43 @@
 
         #writing_diamond {
             pointer-events: none;
-            font-size: 40px;
+            font-size: 25px;
             top: 0px;
             width: 100px;
             font-weight: lighter;
             background: #000;
             position: absolute;
             transition: left 0.05s linear;
-            animation: diamond_blink 1.3s infinite steps(2, jump-none);
+            opacity: 0.7;
             display: none;
         }
 
         #writing_diamond div {
             position: absolute;
-            left: -6px;
+        }
+
+        #writing_diamond .top {
+            transform: rotate(90deg);
+            left: -0.6px;
+            top: 3.4px;
+            letter-spacing: 2.5px;
+        }
+
+        #writing_diamond .left .a {
+            animation: diamond_blink 0.15s infinite steps(2, jump-none);
+        }
+
+        #writing_diamond .left .b {
+            animation: diamond_blink 0.15s 0.07s infinite steps(2, jump-none);
         }
 
         @keyframes diamond_blink {
             0% {
-                opacity: 0.7;
+                opacity: 1;
             }
 
             100% {
-                opacity: 0.3;
+                opacity: 0.5;
             }
         }
 
@@ -116,7 +130,11 @@
     <button hidden>BOOT</button>
     <div id='text'></div>
     <div id='writing_diamond'>
-        <div>❖</div>
+        <div class='top'>🠸🠺</div>
+        <div class='left'>
+            <span class='a'>🠺</span><span class='b'>🠸</span>
+        </div>
+
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -203,12 +221,14 @@
             diamond_html.style.display = display ? 'block' : 'none'
             if (display) {
                 let one_line_height = get_line_height()
-                let text_width = get_text_width(lines)
+                let text_width = get_text_width(lines) + 2
                 let text_height = get_text_height(lines)
 
-                let diamond_top = `calc(50% - ${text_height / 2}px + ${text_height - one_line_height - 2}px)`
+                let line_top = text_height - one_line_height - 1
+
+                let diamond_top = `calc(50% - ${text_height / 2}px + ${line_top}px)`
                 if (start_top) {
-                    diamond_top = start_top + (text_height - one_line_height - 2) + 'px'
+                    diamond_top = start_top + line_top + 'px'
                 }
 
                 if (last_diamond_top != diamond_top) display_diamond_jump()

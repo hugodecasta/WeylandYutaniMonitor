@@ -1,6 +1,6 @@
 {
   "name": "weyland-yutani-monitor",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Weyland Yutani Communication System",
   "main": "index.js",
   "scripts": {
