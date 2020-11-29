@@ -430,11 +430,12 @@
                     let beam_name = await input_beam_name(beams)
                     if (!beam_name) return
                     let { beam_code } = beams[beam_name]
+                    await log('hit **ctrl + enter** to send message', 5000)
                     let message = await free_input()
                     if (!message) return log('message canceled', 3000)
                     await log('sending message . . .')
                     await request('send_message', { beam_name, beam_code, personal_id, message })
-                    // await log('message sent', 3000)
+                    await log('message sent', 3000)
                 }
             },
             'check_messages': {
