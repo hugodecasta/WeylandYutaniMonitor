@@ -6,7 +6,7 @@ Weyland-Yutani IO communication system
 The WY Monitor OS allows multiple distant entities (HQ, colonial bases, planetary detention complex, etc.) to communicate using Secured Communication Beams.
 
 Any entity can connect to any known beam using a beam name and beam code. Once connected, the entity can recieve and send direct messages trough the beam using its personal id.\
-All messages are stored in a secure database accessible via the beam name and code (Old and unread messages can be accessed).\
+All messages are stored in a secure database accessible via the beam name and code (Old and unread messages can be accessed).
 
 The WY Monitor OS requires at least one beam to be connected.
 
