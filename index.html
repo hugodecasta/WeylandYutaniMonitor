@@ -595,13 +595,6 @@
         }
 
         async function boot() {
-            // --- check mobile device
-            if (window.mobileCheck()) {
-                await log('Mobile device detected\nPlease use a proper\n**wide screen machine**', 50000)
-                await log('end of transmission.', 3000)
-                return
-            }
-
             // --- boot system
             await load_os_data()
             await log('boot sequence complete', 1000)
@@ -630,6 +623,13 @@
         }
 
         async function boot_loop() {
+            // --- check mobile device
+            if (window.mobileCheck()) {
+                await log('Mobile device detected\nPlease use a proper\n**wide screen machine**', 50000)
+                await log('end of transmission.', 3000)
+                return
+            }
+
             while (true) {
                 await boot_button()
                 await boot()
