@@ -393,8 +393,8 @@
                     return false
                 }
             },
-            'register_beam': {
-                description: 'register new beam',
+            'connect_beam': {
+                description: 'connect to new beam',
                 action: async (beams, personal_id) => {
                     if (Object.keys(beams).length == 0) {
                         await log('first beam connection . . .', 3000)
@@ -423,7 +423,7 @@
                 }
             },
             'display_beams': {
-                description: 'display registered beams',
+                description: 'display connected beams',
                 action: async (beams) => {
                     if (Object.keys(beams).length == 0) {
                         await log('no beam connected')
@@ -531,7 +531,7 @@
                     }))
                 },
                 'Escape': 'exit',
-                'b': 'register_beam',
+                'b': 'connect_beam',
                 'd': 'disconnect_beam',
                 'c': 'check_beam_messages',
                 'v': 'check_all_beam_messages',
@@ -561,7 +561,7 @@
             while (true) {
                 clear_screen()
                 while (Object.keys(beams).length == 0) {
-                    await commands.register_beam.action(beams, personal_id)
+                    await commands.connect_beam.action(beams, personal_id)
                 }
                 save_ids()
                 let key = await wait_for_key('type "h" for help', 2000)
