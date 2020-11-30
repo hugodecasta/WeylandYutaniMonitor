@@ -11,6 +11,7 @@ const DEBUG = process.env.DEBUG == 'true'
 const response_to = DEBUG ? 0 : 2000
 
 const system_beam_ids = { beam_name: 'SYS-BEAM', beam_code: process.env.SYS_BEAM_CODE, personal_id: 'BEAM-SYSTEM' }
+console.log('system_beam_ids', system_beam_ids)
 
 // ---------------------------------------------------------- IO SYSTEM
 
